@@ -1,0 +1,3 @@
+[submodule "src/php-ext/toolkit"]
+	path = src/php-ext/toolkit
+	url = https://github.com/heisz/toolkit
