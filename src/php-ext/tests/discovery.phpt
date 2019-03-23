@@ -11,7 +11,8 @@ if (!extension_loaded('castptl')) {
 <?php
 /* Check the defined constants */
 echo 'const ' . CPTL_INET4 . ', ' . CPTL_INET6 . ', ' . CPTL_INET_ALL . "\n\n";
-var_dump(cptl_discover(CPTL_INET_ALL, 1, 1));
+cptl_testctl(1);
+var_dump(cptl_discover(CPTL_INET_ALL, 1));
 ?>
 ===END===
 --EXPECTF--

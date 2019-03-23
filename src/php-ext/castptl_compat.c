@@ -14,6 +14,10 @@ void *_WXMalloc(size_t size, int line, char *file) {
     return emalloc(size);
 }
 
+void *_WXCalloc(size_t size, int line, char *file) {
+    return ecalloc(1, size);
+}
+
 void *_WXRealloc(void *original, size_t size, int line, char *file) {
     return erealloc(original, size);
 }

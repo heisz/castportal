@@ -309,11 +309,9 @@ static void cvtIPv6(char *addrBuff, uint8_t *data) {
  *               global PHP constants.
  * @param waitTm Time period (in seconds) to wait for responses to
  *               the UDP query.
- * @param tstMode TRUE (non-zero) if running in test mode, which discards
- *                real discovery responses and processes locked test data.
  * @return Linked list of discovered cast devices or NULL on error/empty.
  */
-CastDeviceInfo *castDiscover(int ipMode, int waitTm, int tstMode) {
+CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
     uint8_t *ptr, msgBufferData[MDNS_MSG_LIMIT], respBuffer[MDNS_MSG_LIMIT];
     uint16_t rTxnId, rFlags, rQueries, rAnswers, rAuthority, rAdditional;
     CastDeviceInfo *device, wrk, *retVal = NULL, *last = NULL;
@@ -410,7 +408,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm, int tstMode) {
             /* Wait for something to read, until timeout has been reached */
             rc = WXSocket_Wait(scktHandle, WXNRC_READ_REQUIRED, &timeout);
             if (rc == WXNRC_TIMEOUT) {
-                if (!tstMode) break;
+                if (_cptl_tstmode == 0) break;
             } else if (rc < 0) {
                 php_error_docref(NULL TSRMLS_CC, E_WARNING,
                               "Unexpected error on wait response: %s",
@@ -424,7 +422,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm, int tstMode) {
             respLen = WXSocket_RecvFrom(scktHandle, respBuffer,
                                         sizeof(respBuffer), 0,
                                         &respAddr, &respAddrLen);
-            if (tstMode) {
+            if (_cptl_tstmode != 0) {
                 if ((respLen == 0) && (timeout <= 0)) {
                     /* Timeout in test mode, simulate fixed responses */
                     if (modeIdx == 1) {
