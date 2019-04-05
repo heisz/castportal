@@ -48,7 +48,18 @@ zend_module_entry castportal_module_entry = {
     STANDARD_MODULE_PROPERTIES
 };
 
+/* Declarations for global ini variables for the extension */
 PHP_INI_BEGIN()
+    /* Note: this default is the Cast application id for 'portal' */
+    STD_PHP_INI_ENTRY("castportal.application_id", "02834648", PHP_INI_SYSTEM,
+                      OnUpdateString, applicationId, zend_castportal_globals,
+                      castportal_globals)
+    STD_PHP_INI_ENTRY("castportal.discovery_timeout", "5000", PHP_INI_SYSTEM,
+                      OnUpdateLong, discoveryTimeout, zend_castportal_globals,
+                      castportal_globals)
+    STD_PHP_INI_ENTRY("castportal.message_timeout", "500", PHP_INI_SYSTEM,
+                      OnUpdateLong, messageTimeout, zend_castportal_globals,
+                      castportal_globals)
 PHP_INI_END()
 
 /* Tracking and destructor for the Cast connection resource object */
@@ -90,6 +101,7 @@ PHP_MSHUTDOWN_FUNCTION(castportal) {
 
     return SUCCESS;
 }
+
 PHP_RINIT_FUNCTION(castportal) {
     return SUCCESS;
 }
@@ -114,13 +126,15 @@ PHP_FUNCTION(cptl_testctl) {
  * Execute a cast discovery process, through a call to cptl_discover().
  *
  * @param ipMode Flagset to determine which IP networks to discover against,
- *               mix of CPTL_INET4 and CPTL_INET6.
- * @param timeout Time period (in seconds) to wait for responses for each
- *                category of network request.
+ *               mix of CPTL_INET4 and CPTL_INET6.  Defaults to ALL if
+ *               unspecified.
+ * @param timeout Time period (in milliseconds) to wait for responses for each
+ *                category of network request.  If unspecified (or zero),
+ *                defaults to the system-level configuration value.
  */
 PHP_FUNCTION(cptl_discover) {
     CastDeviceInfo *info, *next;
-    long ipMode, timeout;
+    long ipMode = 3, timeout = 0;
 #if PHP_MAJOR_VERSION < 7
     zval *zvRow;
 #else
@@ -128,7 +142,7 @@ PHP_FUNCTION(cptl_discover) {
 #endif
 
     /* Read the argument set for the function */
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ll|b",
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|ll",
                               &ipMode, &timeout) != SUCCESS) return;
 
     /* Execute the discovery process */

@@ -453,6 +453,7 @@ void *castReceiveMessage(CastDeviceConnection *conn, int forSenderSession,
                          int fromPortalReceiver, CastNamespace namespace,
                          ProcessResponseCB responseCallback,
                          int expJsonResponse) { 
+    int32_t reqTimeout = CPTL_G(messageTimeout);
     uint8_t rdBuffer[1024];
     unsigned long sslErrNo;
     void *retval = NULL;
@@ -460,7 +461,7 @@ void *castReceiveMessage(CastDeviceConnection *conn, int forSenderSession,
     int rc = 0, wrc;
 
     /* Munch until we munch no more... */
-    while (rc >= 0) {
+    while ((rc >= 0) && (reqTimeout > 0)) {
         if ((_cptl_tstmode != 0) && (conn->ssl == NULL)) {
             rc = _cptl_tstresplen;
             (void) memcpy(rdBuffer, _cptl_tstresp, rc);
@@ -473,10 +474,14 @@ void *castReceiveMessage(CastDeviceConnection *conn, int forSenderSession,
                 case SSL_ERROR_WANT_READ:
                     /* TODO TIMEOUT HERE */
                     wrc = WXSocket_Wait(conn->scktHandle,
-                                        WXNRC_READ_REQUIRED, NULL);
+                                        WXNRC_READ_REQUIRED, &reqTimeout);
                     if (wrc == WXNRC_READ_REQUIRED) {
                         /* Ready to read */
                         rc = 0;
+                    } else if (wrc == WXNRC_TIMEOUT) {
+                        php_error_docref(NULL TSRMLS_CC, E_WARNING,
+                                         "Timeout on wait for socket response");
+                        rc = -1;
                     } else {
                         /* Any other response is an explicit error */
                         php_error_docref(NULL TSRMLS_CC, E_WARNING,

@@ -307,8 +307,8 @@ static void cvtIPv6(char *addrBuff, uint8_t *data) {
  * @param ipMode Flagset to determine which IP networks to discover against,
  *               mix of CPTL_INET4 (1) and CPTL_INET6 (2), as defined in the
  *               global PHP constants.
- * @param waitTm Time period (in seconds) to wait for responses to
- *               the UDP query.
+ * @param waitTm Time period (in milliseconds) to wait for responses to
+ *               the UDP query.  If zero, use the system configuration value.
  * @return Linked list of discovered cast devices or NULL on error/empty.
  */
 CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
@@ -328,6 +328,9 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
     ssize_t respLen;
     int32_t timeout;
     uint32_t rTTL;
+
+    /* Use the global configuration fallback */
+    if (waitTm <= 0) waitTm = CPTL_G(discoveryTimeout);
 
     /* Two passes, one per network type */
     for (modeIdx = 1; modeIdx <= 2; modeIdx++) {
@@ -403,7 +406,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
         }
 
         /* Grab some answers */
-        timeout = waitTm * 1000;
+        timeout = waitTm;
         while (timeout > 0) {
             /* Wait for something to read, until timeout has been reached */
             rc = WXSocket_Wait(scktHandle, WXNRC_READ_REQUIRED, &timeout);

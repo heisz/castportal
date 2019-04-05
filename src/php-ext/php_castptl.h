@@ -29,10 +29,26 @@
 /* Exposed definition of the extension module instance */
 extern zend_module_entry castportal_module_entry;
 
+/* Global settings managed by php.ini (and related) with suitable defaults */
+ZEND_BEGIN_MODULE_GLOBALS(castportal)
+    char *applicationId;
+    long discoveryTimeout;
+    long messageTimeout;
+ZEND_END_MODULE_GLOBALS(castportal)
+
+ZEND_DECLARE_MODULE_GLOBALS(castportal)
+
+/* And the accessor macros for the above */
+#ifdef ZTS
+    #define CPTL_G(v) TSRMG(castportal_globals_id, zend_castportal_globals *, v)
+#else
+    #define CPTL_G(v) (castportal_globals.v)
+#endif
+
 /* Internal tracking elements for test operation */
-long _cptl_tstmode;
-void *_cptl_tstresp;
-long _cptl_tstresplen;
+extern long _cptl_tstmode;
+extern void *_cptl_tstresp;
+extern long _cptl_tstresplen;
 
 /* Standard function definitions for PHP module/request extensions */
 PHP_MINIT_FUNCTION(castportal);
@@ -67,8 +83,8 @@ typedef struct _castDeviceInfo {
  * @param ipMode Flagset to determine which IP networks to discover against,
  *               mix of CPTL_INET4 (1) and CPTL_INET6 (2), as defined in the
  *               global PHP constants.
- * @param waitTm Time period (in seconds) to wait for responses to
- *               the UDP query.
+ * @param waitTm Time period (in milliseconds) to wait for responses to
+ *               the UDP query.  If zero, use the system configuration value.
  * @return Linked list of discovered cast devices or NULL on error/empty.
  */
 CastDeviceInfo *castDiscover(int ipMode, int waitTm);
