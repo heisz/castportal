@@ -64,6 +64,7 @@ PHP_FUNCTION(cptl_device_connect);
 PHP_FUNCTION(cptl_device_auth);
 PHP_FUNCTION(cptl_device_ping);
 PHP_FUNCTION(cptl_device_close);
+PHP_FUNCTION(cptl_app_available);
 
 /* Remainder of this file deals with internal functional elements */
 
@@ -99,6 +100,7 @@ typedef struct {
     int isConnected;
     WXBuffer readBuffer;
     char readBufferData[1024];
+    int32_t requestId;
 } CastDeviceConnection;
 
 /**
@@ -215,6 +217,8 @@ typedef void *ProcessResponseCB(CastDeviceConnection *conn, void *content,
  * @param expJsonResponse True (greater than zero) if the callback is expecting
  *                        only JSON content, false (zero) for binary-only
  *                        content and negative for any response type.
+ * @param requestId If greater than zero, match against the provided request
+ *                  identifier.  This is ignored if the response is not JSON.
  * @return Non-null if a valid response was determined by the response callback
  *         function (value returned from callback is passed through) or NULL
  *         for any processing error (logged internally).  CPTL_RESP_ERROR is
@@ -223,6 +227,16 @@ typedef void *ProcessResponseCB(CastDeviceConnection *conn, void *content,
 void *castReceiveMessage(CastDeviceConnection *conn, int forSenderSession,
                          int fromPortalReceiver, CastNamespace namespace,
                          ProcessResponseCB responseCallback,
-                         int expJsonResponse);
+                         int expJsonResponse, int32_t requestId);
+
+/**
+ * Verify the availability of the configured application instance on the
+ * associated device (connection).
+ *
+ * @param conn The connection instance returned from the device connect method.
+ * @return Zero on success (communicated and configuration application is
+ *         available), -1 on error or unavailable application (logged).
+ */
+int castAppCheckAvailability(CastDeviceConnection *conn);
 
 #endif

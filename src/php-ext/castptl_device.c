@@ -215,6 +215,7 @@ CastDeviceConnection *castDeviceConnect(char *devAddr, int port) {
     }
     retVal->scktHandle = scktHandle;
     retVal->isConnected = FALSE;
+    retVal->requestId = 0;
 
     /* Setup SSL context (negotiated maximum) and associate to socket */
     if (((connMethod = TLS_client_method()) == NULL) ||
@@ -286,6 +287,7 @@ static uint8_t _tstPongResp[] = {
     0x3A, 0x22, 0x50, 0x4F, 0x4E, 0x47, 0x22, 0x7D    // :"PONG"}
 };
 
+/* Marker tag for response and validation return */
 static char *_pongOk = "PONG";
 
 /**
@@ -295,7 +297,6 @@ static char *_pongOk = "PONG";
  */
 static void *validatePongResponse(CastDeviceConnection *conn, void *content,
                                   size_t contentLen) {
-WXBuffer tstBuff;
     WXJSONValue *val = (WXJSONValue *) content;
     WXJSONValue *respType = WXHash_GetEntry(&(val->value.oval), "type",
                                         WXHash_StrHashFn, WXHash_StrEqualsFn);
@@ -330,7 +331,7 @@ int castDevicePing(CastDeviceConnection *conn) {
     _cptl_tstresp = _tstPongResp;
     _cptl_tstresplen = sizeof(_tstPongResp);
     retval = castReceiveMessage(conn, FALSE, FALSE, NS_HEARTBEAT,
-                                validatePongResponse, TRUE);
+                                validatePongResponse, TRUE, -1);
     if (retval != _pongOk) {
         php_error_docref(NULL TSRMLS_CC, E_WARNING,
                          "Failed to obtain PONG response to PING request");

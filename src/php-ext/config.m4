@@ -39,7 +39,8 @@ if test $PHP_CASTPORTAL != "no"; then
     PHP_ADD_INCLUDE(toolkit/src/utility)
     PHP_NEW_EXTENSION(castportal,
                       php_castptl.c castptl_discover.c castptl_device.c \
-                      castptl_auth.c castptl_message.c castptl_compat.c \
+                      castptl_auth.c castptl_app.c castptl_message.c \
+                      castptl_compat.c \
                       toolkit/src/lang/json.c toolkit/src/network/socket.c \
                       toolkit/src/utility/hash.c toolkit/src/utility/array.c \
                       toolkit/src/utility/buffer.c, 

@@ -27,6 +27,7 @@ static const zend_function_entry cptl_functions[] = {
     PHP_FE(cptl_device_auth, NULL)
     PHP_FE(cptl_device_ping, NULL)
     PHP_FE(cptl_device_close, NULL)
+    PHP_FE(cptl_app_available, NULL)
     PHP_FE_END
 };
 
@@ -257,6 +258,8 @@ PHP_FUNCTION(cptl_device_auth) {
  * instance.
  *
  * @param conn The device connection instance returned from cptl_device_connect.
+ * @return True if the device connection is still valid (pong response), false
+ *         on failure (logged).
  */
 PHP_FUNCTION(cptl_device_ping) {
     CastDeviceConnection *conn;
@@ -327,4 +330,40 @@ PHP_FUNCTION(cptl_device_close) {
         RETURN_FALSE;
     }
 #endif
+}
+
+/**
+ * Validate the availability of the configured portal application instance
+ * on the provided device.
+ *
+ * @param conn The device connection instance returned from cptl_device_connect.
+ * @return True if the application is defined/available or false on any failure
+ *         in the request (logged).
+ */
+PHP_FUNCTION(cptl_app_available) {
+    CastDeviceConnection *conn;
+    zval *zvRes = NULL;
+
+    /* Access the resource for the associated connection */
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r",
+                              &zvRes) != SUCCESS) return;
+
+#if PHP_MAJOR_VERSION < 7
+    ZEND_FETCH_RESOURCE(conn, CastDeviceConnection *, &zvRes, -1,
+                        PHP_CASTPTL_DEVCONN_RESNAME, castptl_devconn_resid);
+#else
+    conn = (CastDeviceConnection *) zend_fetch_resource(Z_RES_P(zvRes),
+                           PHP_CASTPTL_DEVCONN_RESNAME, castptl_devconn_resid);
+#endif
+    if (conn == NULL) {
+        RETURN_FALSE;
+        return;
+    }
+
+    /* And check for the availability of the application */
+    if (castAppCheckAvailability(conn) < 0) {
+        RETURN_FALSE;
+    } else {
+        RETURN_TRUE;
+    }
 }

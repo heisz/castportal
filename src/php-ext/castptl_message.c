@@ -10,6 +10,9 @@
 #include "buffer.h"
 #include "json.h"
 
+/* For debugging, uncomment the following */
+// #define _PHP_TRACE_MSG 1
+
 /*
  * For reference, the protofbuf definition for the cast message protocol.
  *
@@ -186,6 +189,9 @@ int castSendMessage(CastDeviceConnection *conn, int fromSenderSession,
     if ((_cptl_tstmode != 0) && (conn->ssl == NULL)) return 0;
 
     /* Issue the message */
+#ifdef _PHP_TRACE_MSG
+    dump("WRITE", &msgBuffer);
+#endif
     if (SSL_write(conn->ssl, msgBuffer.buffer, msgBuffer.length) < 0) {
         sslErrNo = ERR_get_error();
         ERR_error_string_n(sslErrNo, errBuff, sizeof(errBuff));
@@ -214,13 +220,13 @@ static void *parseInboundMessages(CastDeviceConnection *conn,
                                   int forSenderSession, int fromPortalReceiver,
                                   CastNamespace targNamespace,
                                   ProcessResponseCB responseCallback,
-                                  int expJsonResponse) {
+                                  int expJsonResponse, int32_t requestId) {
     uint32_t msgLen = 0, msgLimit, fragIdx, fragType, fragLen, fragVarInt;
     int idx, isSenderSession, isPortalReceiver, matched;
     int32_t msgProtoVersion, contentType, contentLen;
     WXBuffer *rdBuffer = &(conn->readBuffer);
+    WXJSONValue *jsonVal, *requestIdVal;
     CastNamespace namespace;
-    WXJSONValue *jsonVal;
     void *retval = NULL;
     uint8_t *content;
 
@@ -353,7 +359,7 @@ static void *parseInboundMessages(CastDeviceConnection *conn,
                 (isSenderSession < 0) || (isPortalReceiver < 0) ||
                 (contentType == -1) || (content == NULL)) {
             php_error_docref(NULL TSRMLS_CC, E_WARNING,
-                             "Missing /invalid elements in the msg response");
+                             "Missing/invalid elements in the msg response");
             goto msg_error;
         }
 
@@ -377,38 +383,63 @@ static void *parseInboundMessages(CastDeviceConnection *conn,
             if ((contentType != 0) && (expJsonResponse)) matched = FALSE;
         }
 
-        if (matched) {
-            if (contentType == 0) {
-                /* Strings are always JSON */
-                /* Not a pretty thing but we can muck the buffer backwards */
-                (void) memmove(content - 1, content, contentLen); content--;
-                content[contentLen] = '\0';
-                jsonVal = WXJSON_Decode(content);
-                if (jsonVal == NULL) {
-                    php_error_docref(NULL TSRMLS_CC, E_WARNING,
-                                     "Allocation failure in JSON parsing");
-                    goto msg_error;
-                } else if (jsonVal->type == WXJSONVALUE_ERROR) {
-                    php_error_docref(NULL TSRMLS_CC, E_WARNING,
-                                     "Invalid JSON response: %s",
-                                     WXJSON_GetErrorStr(
-                                               jsonVal->value.error.errorCode));
-                    WXJSON_Destroy(jsonVal);
-                    jsonVal = NULL;
-                    /* Not fatal from a message stream perspective */
-                } else {
-                    retval = (*responseCallback)(conn, jsonVal, -1);
-                    if (retval != (void *) jsonVal) {
-                        /* Discard source JSON unless it's the return value */
-                        WXJSON_Destroy(jsonVal);
-                        jsonVal = NULL;
-                    }
+        if (contentType == 0) {
+            /* Strings are always JSON, so just parse it */
+            /* Not a pretty thing but we can muck the buffer backwards */
+            (void) memmove(content - 1, content, contentLen); content--;
+            content[contentLen] = '\0';
+            jsonVal = WXJSON_Decode(content);
+            if (jsonVal == NULL) {
+                php_error_docref(NULL TSRMLS_CC, E_WARNING,
+                                 "Allocation failure in JSON parsing");
+                goto msg_error;
+            } else if (jsonVal->type == WXJSONVALUE_ERROR) {
+                php_error_docref(NULL TSRMLS_CC, E_WARNING,
+                                 "Invalid JSON response: %s",
+                                 WXJSON_GetErrorStr(
+                                           jsonVal->value.error.errorCode));
+                WXJSON_Destroy(jsonVal);
+                jsonVal = NULL;
+
+                /* Not fatal from a message stream perspective */
+                consumeBuffer(rdBuffer, msgLen + 4);
+                continue;
+            }
+
+            /* Check for request id, if required */
+            if (requestId > 0) {
+                requestIdVal = WXHash_GetEntry(&(jsonVal->value.oval),
+                                               "requestId",
+                                               WXHash_StrHashFn,
+                                               WXHash_StrEqualsFn);
+                if ((requestIdVal == NULL) ||
+                        (requestIdVal->type != WXJSONVALUE_INT) ||
+                        (requestIdVal->value.ival != requestId)) {
+                    matched = FALSE;
                 }
+            }
+        }
+
+        if (matched) {
+            if (jsonVal != NULL) {
+                retval = (*responseCallback)(conn, jsonVal, -1);
+                if (retval != (void *) jsonVal) {
+                    /* Discard source JSON unless it's the return value */
+                    WXJSON_Destroy(jsonVal);
+                }
+                jsonVal = NULL;
             } else {
                 retval = (*responseCallback)(conn, content, contentLen);
             }
         } else {
             /* TODO - do we debug the general status messages? */
+            /* TODO - capture unmatched responses with source id? */
+        }
+
+        /* Clean up parsed value if it wasn't consumed for return */
+        if (jsonVal != NULL) {
+            WXJSON_Destroy(jsonVal);
+            jsonVal = NULL;
         }
 
         /* Consume message content */
@@ -444,6 +475,8 @@ msg_error:
  * @param expJsonResponse True (greater than zero) if the callback is expecting
  *                        only JSON content, false (zero) for binary-only
  *                        content and negative for any response type.
+ * @param requestId If greater than zero, match against the provided request
+ *                  identifier.  This is ignored if the response is not JSON.
  * @return Non-null if a valid response was determined by the response callback
  *         function (value returned from callback is passed through) or NULL
  *         for any processing error (logged internally).  CPTL_RESP_ERROR is
@@ -452,7 +485,7 @@ msg_error:
 void *castReceiveMessage(CastDeviceConnection *conn, int forSenderSession,
                          int fromPortalReceiver, CastNamespace namespace,
                          ProcessResponseCB responseCallback,
-                         int expJsonResponse) { 
+                         int expJsonResponse, int32_t requestId) { 
     int32_t reqTimeout = CPTL_G(messageTimeout);
     uint8_t rdBuffer[1024];
     unsigned long sslErrNo;
@@ -516,10 +549,13 @@ void *castReceiveMessage(CastDeviceConnection *conn, int forSenderSession,
             }
 
             /* And attempt to parse inbound message elements */
-            // dump("READ", &(conn->readBuffer));
+#ifdef _PHP_TRACE_MSG
+            dump("READ", &(conn->readBuffer));
+#endif
             retval = parseInboundMessages(conn, forSenderSession,
                                           fromPortalReceiver, namespace,
-                                          responseCallback, expJsonResponse);
+                                          responseCallback, expJsonResponse,
+                                          requestId);
             if (retval != NULL) {
                 /* There was some matching response, good or bad */
                 return (retval == CPTL_RESP_ERROR) ? NULL: retval;
