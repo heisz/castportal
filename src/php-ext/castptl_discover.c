@@ -18,7 +18,7 @@
 #endif
 
 /* Utility methods to enable multicast options for the discovery sockets */
-static int multicastIPv4(wxsocket_t sckt) {
+static int multicastIPv4(WXSocket sckt) {
     unsigned char loop = 1, ttl = 1;
     struct sockaddr_in addr;
     struct ip_mreq mreq;
@@ -37,7 +37,7 @@ static int multicastIPv4(wxsocket_t sckt) {
                                      &mreq, sizeof(mreq)) < 0) return -1;
     return 0;
 }
-static int multicastIPv6(wxsocket_t sckt) {
+static int multicastIPv6(WXSocket sckt) {
     unsigned int loop = 1, hops = 1;
     struct sockaddr_in6 addr;
     struct ipv6_mreq mreq;
@@ -321,7 +321,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
     char *targetAddr, txtBuff[256];
     QNameSegment *names = NULL;
     socklen_t respAddrLen;
-    wxsocket_t scktHandle;
+    WXSocket scktHandle;
     int rc, modeIdx, idx;
     WXBuffer msgBuffer;
     unsigned int slen;
@@ -344,7 +344,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
             php_error_docref(NULL TSRMLS_CC, E_WARNING,
                              "Error opening discovery socket for %s: %s",
                              targetAddr, WXSocket_GetErrorStr(
-                                                WXSocket_GetSystemErrNo()));
+                                                WXSocket_GetLastErrNo()));
             continue;
         }
 
@@ -352,7 +352,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
         if (WXSocket_SetNonBlockingState(scktHandle, TRUE) != WXNRC_OK) {
             php_error_docref(NULL TSRMLS_CC, E_WARNING,
                              "Error marking socket for non-blocking: %s",
-                             WXSocket_GetErrorStr(WXSocket_GetSystemErrNo()));
+                             WXSocket_GetErrorStr(WXSocket_GetLastErrNo()));
             WXSocket_Close(scktHandle);
             freeaddrinfo(addrInfo);
             continue;
@@ -364,7 +364,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
         if (rc < 0) {
             php_error_docref(NULL TSRMLS_CC, E_WARNING,
                              "Error marking multicast options: %s",
-                             WXSocket_GetErrorStr(WXSocket_GetSystemErrNo()));
+                             WXSocket_GetErrorStr(WXSocket_GetLastErrNo()));
             WXSocket_Close(scktHandle);
             freeaddrinfo(addrInfo);
             continue;
@@ -399,7 +399,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
                             addrInfo->ai_addr, addrInfo->ai_addrlen) < 0) {
             php_error_docref(NULL TSRMLS_CC, E_WARNING,
                              "Error broadcasting mDNS query: %s",
-                             WXSocket_GetErrorStr(WXSocket_GetSystemErrNo()));
+                             WXSocket_GetErrorStr(WXSocket_GetLastErrNo()));
             WXSocket_Close(scktHandle);
             freeaddrinfo(addrInfo);
             continue;
@@ -415,7 +415,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
             } else if (rc < 0) {
                 php_error_docref(NULL TSRMLS_CC, E_WARNING,
                               "Unexpected error on wait response: %s",
-                              WXSocket_GetErrorStr(WXSocket_GetSystemErrNo()));
+                              WXSocket_GetErrorStr(WXSocket_GetLastErrNo()));
                 break;
             }
 
@@ -449,7 +449,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm) {
             if (respLen <= 0) {
                 php_error_docref(NULL TSRMLS_CC, E_WARNING,
                               "Error on response read: %s",
-                              WXSocket_GetErrorStr(WXSocket_GetSystemErrNo()));
+                              WXSocket_GetErrorStr(WXSocket_GetLastErrNo()));
                 break;
             }
 

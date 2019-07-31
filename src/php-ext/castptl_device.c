@@ -184,7 +184,7 @@ CastDeviceConnection *castDeviceConnect(char *devAddr, int port) {
     const SSL_METHOD *connMethod;
     CastDeviceConnection *retVal;
     unsigned long sslErrNo;
-    wxsocket_t scktHandle;
+    WXSocket scktHandle;
 
     /* Allocate connection/resource object for complex return */
     retVal = (CastDeviceConnection *) WXMalloc(sizeof(CastDeviceConnection));
@@ -210,7 +210,7 @@ CastDeviceConnection *castDeviceConnect(char *devAddr, int port) {
                                NULL) != WXNRC_OK) {
         php_error_docref(NULL TSRMLS_CC, E_WARNING,
                          "Connection failure for %s: %s", devAddr,
-                         WXSocket_GetErrorStr(WXSocket_GetSystemErrNo()));
+                         WXSocket_GetErrorStr(WXSocket_GetLastErrNo()));
         return NULL;
     }
     retVal->scktHandle = scktHandle;

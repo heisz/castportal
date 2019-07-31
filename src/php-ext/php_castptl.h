@@ -94,7 +94,7 @@ CastDeviceInfo *castDiscover(int ipMode, int waitTm);
 #define PHP_CASTPTL_DEVCONN_RESNAME "CastConnection"
 
 typedef struct {
-    wxsocket_t scktHandle;
+    WXSocket scktHandle;
     SSL_CTX *sslCtx;
     SSL *ssl;
     int isConnected;
